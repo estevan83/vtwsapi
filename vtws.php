@@ -143,8 +143,8 @@ if($createOrder == true){
     $dataMM = array('sostatus' => 'Delivered','id' => '6x142' );
     
     
-    $data[]
-    $record = $client->doRevise($module, $data);
+  //  $data[]
+   // $record = $client->doRevise($module, $data);
     
     if($record) {
         print_r($record);
