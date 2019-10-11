@@ -321,7 +321,7 @@ class Vtiger_WSClient {
 	}
         
         /**
-	 * Do Update Operation
+	 * Do Revise Operation
 	 */
 	function doRevise($module, $valuemap) {
 		// Perform re-login if required.

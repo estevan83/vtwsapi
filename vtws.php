@@ -12,6 +12,8 @@ $ack = $params['ack'];
 $url = $params['url'];
 
 // Flag per testare le funzioni
+$describeContact = false;
+$describeSalesOrder = true;
 $createContact = false;
 $createOrder = false;
 $updateOrder = true;
@@ -40,6 +42,27 @@ print_r($client->doDescribe('SalesOrder'));
 
 die();
 */
+
+/**
+ * Restituisce la lista dei campi del contatto
+ */
+if ($describeContact == true)
+{
+    $result = $client->doDescribe('Contacts');
+    print_r ($result);
+}
+
+/**
+ * Restituisce la lista dei campi del modulo Ordini di Vendita
+ */
+if ($describeSalesOrder == true)
+{
+    $result = $client->doDescribe('SalesOrder');
+    print_r ($result);
+}
+
+
+
 //----------------------------------
 // Creazione del contatto in Vtiger
 //----------------------------------
@@ -148,12 +171,10 @@ if($updateOrder == true){
     $data = $client->doRetrieve($wsId);
     
     
-    
-    $data = array(
-                    'sostatus' => 'Delivered',
-                    'invoicestatus' => 'Autocreated',
-                    'id' => '6x142'
-    );
+   
+    $data['sostatus'] = 'Delivered';
+    $data['invoicestatus'] = 'Autocreated';
+    $data['id'] = '6x142';
     
     $record = $client->doRevise($module, $data);
     
@@ -167,6 +188,6 @@ if($updateOrder == true){
     
 }
     
-   
     
-           
+   
+          
