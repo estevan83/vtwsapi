@@ -18,11 +18,14 @@ $token = "";
 
 
 //  2.1. Inserimento di un ordine
-$insertNewOrder = true; // non funziona
+$insertNewOrder = false; // non funziona  
+//<b>Warning</b>:  Invalid argument supplied for foreach() in <b>/var/www/html/webapp/api/index.php</b> on line <b>1089</b><br />
+
 
 //2.3. Interrogazione ultimo stato
 $lastOrderStatus = false; // Da verificare con un ordine vero
 $lastOrderStatusID = 100;
+// {"status":"warning","message":"No data found.","data":[]}
 
 // 2.4. Interrogazione storico GLS
 $storicogls = false; // OK Sembra funzionare => da verifcare con un ID VERO
@@ -31,9 +34,12 @@ $storicogls = false; // OK Sembra funzionare => da verifcare con un ID VERO
 // 3.1. Interrogazione Stock prodotti
 $getqtyproduct = false; // Login non autorizzata
 $codicearticolo = "1";
+// string(94) "{"status":"error","message":"getqtyproduct -> Login non autorizzata o funzione non abilitata"}"
 
 // 4.1. Inserimento contatto
-$creaContatto = false; // ERRORE
+$creaContatto = true; // ERRORE
+// <title>Page Not Found</title >
+
 
 
 if(strlen($token) == 0){
@@ -97,6 +103,7 @@ if($creaContatto == true){
         $result = curl_exec($ch);
         $response = json_decode($result);
         echo $result.PHP_EOL;
+        echo $response.PHP_EOL;
         curl_close($ch);
     }
 }
