@@ -1,27 +1,31 @@
 <?php
 
 
+// Legge i parametri dal file
+$path = dirname(__FILE__);
+$params = file_get_contents(dirname(__FILE__) ."/params.json");
+
+$params =  json_decode($params, true);
+
+$usr = $params['usr'];
+$ack = $params['ack'];
+$url = $params['url'];
+
+// Flag per testare le funzioni
 $createContact = false;
 $createOrder = false;
-
 $updateOrder = true;
 
-
-
-
-$usr = '';
-$ack = '';
-$url = '';
-
+// Codice di gestione degli esempi
 
 include_once('vtwsclib/Vtiger/WSClient.php');
-
 
 $client = new Vtiger_WSClient($url);
 $login = $client->doLogin($usr, $ack);
 if(!$login) 
     echo 'Login Failed';
-else echo 'Login Successful';
+else 
+    echo 'Login Successful';
 
 
 /*
@@ -131,20 +135,27 @@ if($createOrder == true){
     }
 }
 
-/* */
+
 //----------------------------------
 // Aggiornamento stato ordine
 //----------------------------------
 
-//----------------------------------
-    //
+if($updateOrder == true){
     
+
     $module = 'SalesOrder';
-    $dataMM = array('sostatus' => 'Delivered','id' => '6x142' );
+    $wsId = '6x142';
+    $data = $client->doRetrieve($wsId);
     
     
-  //  $data[]
-   // $record = $client->doRevise($module, $data);
+    
+    $data = array(
+                    'sostatus' => 'Delivered',
+                    'invoicestatus' => 'Autocreated',
+                    'id' => '6x142'
+    );
+    
+    $record = $client->doRevise($module, $data);
     
     if($record) {
         print_r($record);
@@ -153,6 +164,8 @@ if($createOrder == true){
         $error = $client->lastError();
         throw new Exception($error['code']. ' ' .$error['message']);
     }
+    
+}
     
    
     
