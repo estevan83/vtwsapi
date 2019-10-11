@@ -1,27 +1,24 @@
 <?php
 
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ Tester per la verifica dell'applicativo daplink
  */
 
 
-$user = "testinsert@dapsides.it";
-$pass = "testinsert@dapsides.it";
-$url = "http://62.97.45.44:443/webapp/api/v3/createToken.php/process/" . $user . "/" . $pass;
-//echo $url;
+// Legge i parametri dal file
+// --------------------------
+$path = dirname(__FILE__);
+$params = file_get_contents(dirname(__FILE__) ."/params.json");
 
-//$token = "dd6a6fcdc0ae1b8b463b4bb691a0f12a";
+$params =  json_decode($params, true);
+
+$url = $params['dl.url'] . $params['dl.usr'] . "/" . $params['dl.pwd'];
+
 $token = "";
-
-
 
 
 //  2.1. Inserimento di un ordine
 $insertNewOrder = true; // non funziona
-
-
 
 //2.3. Interrogazione ultimo stato
 $lastOrderStatus = false; // Da verificare con un ordine vero
@@ -37,10 +34,6 @@ $codicearticolo = "1";
 
 // 4.1. Inserimento contatto
 $creaContatto = false; // ERRORE
-
-
-
-
 
 
 if(strlen($token) == 0){
