@@ -210,16 +210,37 @@ if ($lastOrderStatus == true) {
 
 
 if ($insertNewOrder == true) {
+    
+        $url = "http://62.97.45.44:443/webapp/api/index.php/insertorder";
+    
+        //https://vtiger.bigbeat.eu/index.php?module=SalesOrder&view=Detail&record=139&mode=showDetailViewByMode&requestMode=full&tab_label=Ordine%20di%20Vendita%20Details&app=INVENTORY
+    $data = array();
+    
+    $data[1] = array(
+        "orderID" => "SO5", // ti passo l'id del crm es 139 o il numero univoco ordin S05?
+        "customerName" => "pippo", // mi devi dire cosa ti aspetti
+        "destCity" =>"Barcelona",
+        "destAddress" => "Via le mani da li",
+        "destAreaCode" => "XX", // cosa intendi
+        "destPostalCode" => "20200", // cap
+        "destCountryCode" => "IT",
+        "destPhone" => "123456789", // cellulare del contatto
+        "destEmail" =>"",
+        "orderDate" => "2017-12-13",
+        "deliveryInfo"=>"a las mañana",
+        "dateOfDelivery"=>"2018-01-07",
+        "cod"=>0, // questo cosa indica
+        "totalAmount" => 80.00, // totale dell'ordine
+        
+        "orderRowID" => "1",
+        "productID" =>"01xmlt6a",
+        "productName" => "CREMA XWZ",
+        "productQty" => 2
+    );
 
-    $url = "http://62.97.45.44:443/webapp/api/index.php/insertorder";
 
-
-   $data = '{"1":{"orderID":"testorder1","customerName":"pippo","destAddress":"Via le mani da li",'
-           . '"destPostalCode":"20200","destCity":"Barcelona","destAreaCode":"XX","destCountryCode":"IT",'
-           . '"destPhone":"123456789", "destEmail":"","orderDate":"2017-12-13","deliveryInfo":"a las mañana",'
-           . '"dateOfDelivery":"2018-01-07","cod":0,"totalAmount":80.00,"orderRowID":"1","productID":"01xmlt6a",'
-           . '"productName":"CREMA XWZ","productQty":2}}';
-
+    $data = json_encode($data);
+    
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_VERBOSE, 1);

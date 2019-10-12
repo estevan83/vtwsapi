@@ -98,6 +98,7 @@ if($createContact == true){
 //----------------------------------
 if($createOrder == true){
     $data = array(
+            'department' => 'codiceDaplink',
             'subject' =>  'Ordine NUmero',
             'sostatus' => 'Created',
             'invoicedate' => date("Y-m-d"),
