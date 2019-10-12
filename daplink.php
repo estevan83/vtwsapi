@@ -19,13 +19,13 @@ $token = "";
 
 
 //  2.1. Inserimento di un ordine
-$insertNewOrder = false; // non funziona  
-//<b>Warning</b>:  Invalid argument supplied for foreach() in <b>/var/www/html/webapp/api/index.php</b> on line <b>1089</b><br />
+$insertNewOrder = true; // non funziona  
+//{"status":"error","message":"Duplicate orderID"}
 
 
 //2.3. Interrogazione ultimo stato
 $lastOrderStatus = false; // Da verificare con un ordine vero
-$lastOrderStatusID = 100;
+$lastOrderStatusID = "testorder1";
 // {"status":"warning","message":"No data found.","data":[]}
 
 // 2.4. Interrogazione storico GLS
@@ -38,7 +38,7 @@ $codicearticolo = "1";
 // string(94) "{"status":"error","message":"getqtyproduct -> Login non autorizzata o funzione non abilitata"}"
 
 // 4.1. Inserimento contatto
-$creaContatto = true; // ERRORE
+$creaContatto = false; // ERRORE
 // <title>Page Not Found</title >
 
 
@@ -214,10 +214,11 @@ if ($insertNewOrder == true) {
     $url = "http://62.97.45.44:443/webapp/api/index.php/insertorder";
 
 
-    $data = '{"1":{"orderID":"XXXXX","customerName":"XXXXXX","destAddress":"XXXXX","destPostalCode":"XXXXX",'
-            . '"destCity":"XXXXXX","destAreaCode":"XX","destCountryCode":"XX","destPhone":"XXXXXXXX", '
-            . '"destEmail":"XXXXXXX","orderDate":"YYYY-MM-DD",'
-            . '"deliveryInfo":"Lorem ipsum","cod":XX,"totalAmount":XX.XX,"orderRowID":"X","productID":"XXXX","productName":"XXXXX","productQty":X}';
+   $data = '{"1":{"orderID":"testorder1","customerName":"pippo","destAddress":"Via le mani da li",'
+           . '"destPostalCode":"20200","destCity":"Barcelona","destAreaCode":"XX","destCountryCode":"IT",'
+           . '"destPhone":"123456789", "destEmail":"","orderDate":"2017-12-13","deliveryInfo":"a las mañana",'
+           . '"dateOfDelivery":"2018-01-07","cod":0,"totalAmount":80.00,"orderRowID":"1","productID":"01xmlt6a",'
+           . '"productName":"CREMA XWZ","productQty":2}}';
 
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
