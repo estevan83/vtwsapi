@@ -13,11 +13,13 @@ $url = $params['url'];
 
 // Flag per testare le funzioni
 $describeContact = false;
-$describeSalesOrder = true;
+$describeSalesOrder = false;
 $createContact = false;
 $createOrder = false;
-$updateOrder = true;
-
+$updateOrder = false;
+$describeProduct = false;
+$createProduct  = false;
+$updateProduct = true;
 // Codice di gestione degli esempi
 
 include_once('vtwsclib/Vtiger/WSClient.php');
@@ -43,6 +45,9 @@ print_r($client->doDescribe('SalesOrder'));
 die();
 */
 
+   
+
+
 /**
  * Restituisce la lista dei campi del contatto
  */
@@ -60,6 +65,16 @@ if ($describeSalesOrder == true)
     $result = $client->doDescribe('SalesOrder');
     print_r ($result);
 }
+
+/**
+ * Restituisce la lista dei campi del modulo Prodotti
+ */
+if ($describeProduct == true)
+{
+    $result = $client->doDescribe('Products');
+    print_r ($result);
+}
+
 
 
 
@@ -189,6 +204,52 @@ if($updateOrder == true){
     
 }
     
+
+
+
+if ($createProduct == true)
+{
+    $data = array (
+        'productname' => 'nuovo prodotto',      // Nome del Prodotto
+        'productcode' => '03nd2t7v',            // Codice Seriale
+        'discontinued' => '1',                  // Lasciare sempre 1
+        'unit_price' => '20.234',               // Prezzo per pezzo
+        'commissionrate' => '0.00',             // Commissioni 
+        'description' => 'Descrizione del',     // Descrizione dettagliata del prodotto
+        'tax1' => '22.000',                     // Aliquota IVA  
+    );
+    
+    $module = 'Products';
+    $record = $client->doCreate($module,$data);
+    
+    if($record) {
+        print_r($record);
+    }
+    else{
+        $error = $client->lastError();
+        throw new Exception($error['code']. ' ' .$error['message']);
+    }    
+    
+}
+
+if ($updateProduct == true){
+     $module = 'Products';
+    $wsId = '14x145';
+    $data = $client->doRetrieve($wsId);
+    
     
    
-          
+    $data['productcode'] = 'Delivered';
+    $data['discontinued'] = '1';
+    $data['id'] = '14x145';
+    
+    $record = $client->doRevise($module, $data);
+    
+    if($record) {
+        print_r($record);
+    }
+    else{
+        $error = $client->lastError();
+        throw new Exception($error['code']. ' ' .$error['message']);
+    }
+}
