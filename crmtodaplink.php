@@ -67,7 +67,6 @@ if(strlen($token) == 0){
         $token = $response->csrf_value;
     }
 }
-
 // -----------------------------------------------------------
 // Creazione del contatto
 // ------------------------------------------------------------
@@ -77,8 +76,8 @@ if($creaContatto == true){
 
     $data = array(
         'leadID' => '999',
-        'customerFirstName' => 'estevan',
-        'customerLastName' => 'civera',
+        'customerFirstName' => 'estevffan',
+        'customerLastName' => 'civeffra',
         'destEmail' => 'lamail@mail.it',
         'productName' => 'nome prodotto',
         'totalAmount' => 100,
@@ -109,6 +108,45 @@ if($creaContatto == true){
         curl_close($ch);
     }
 }
+
+$updateContatto = false;
+if ($updateContatto == true)
+{
+    
+    $leadID = 'AA123'; // Id contatto da aggiornare 
+    $url="http://62.97.45.44:443/webapp/api/updateLead/".$leadID;
+    $data = '{"customerFirstName":"Emanuele2","customerLastName":"Rizzo2","destPhone":"987654", "destEmail":"testoooo@mail.it", "destAddress":"XXX", "destPostalCode":"XXX", "destCity":"XXX", "destAreaCode":"provincia", "destCountryCode":"XXX", "orderDate":"XXX", "deliveryInfo":" "}';
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_VERBOSE, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json','Authorization: '.$token));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    if (curl_errno($ch)) {
+        echo curl_errno($ch);
+        echo curl_error($ch);
+    } else {
+        $result = curl_exec($ch);
+        $response = json_decode( $result );
+        echo $result.PHP_EOL;
+        curl_close($ch);
+
+    }
+
+}
+
+
+
+
+
+
+
+
+
 
 
 if ($getqtyproduct == true) {
@@ -208,7 +246,7 @@ if ($lastOrderStatus == true) {
     }
 }
 
-
+$insertNewOrder = true;
 
 if ($insertNewOrder == true) {
     
