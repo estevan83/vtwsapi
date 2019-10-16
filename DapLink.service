@@ -1,0 +1,442 @@
+<?php
+
+// creo ordini di vendita su ims con diversi prodotti
+// fare uno scheduler che legge per ogni prodotto di tutti gli ordini di vendita crea un array da inviare col curl
+require_once('include/utils/utils.php');
+require_once("modules/Emails/class.phpmailer.php");
+require_once("modules/Emails/mail.php");
+require_once('include/logging.php');
+require_once("config.php");
+
+include_once 'include/Webservices/Query.php';
+
+global $adb;
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+$current_user = Users::getActiveAdminUser();
+
+
+//$path = dirname(__FILE__);
+//$params = file_get_contents(dirname(__FILE__) ."/params.json");
+//$params =  json_decode($params, true);	
+
+
+
+
+$salesOrderQuery="SELECT  contact.*, product.*, vtiger_inventoryproductrel.quantity AS productQty,
+	vtiger_soshipads.ship_city AS destCity, vtiger_soshipads.ship_code AS destPostalCode, vtiger_soshipads.ship_country AS destCountryCode, vtiger_soshipads.ship_state AS destAreaCode, vtiger_soshipads.ship_street AS destAddress,
+	vtiger_salesorder.duedate AS orderDate , vtiger_crmentity.description AS deliveryInfo, vtiger_salesorder.pre_tax_total AS totalAmount,
+--	vtiger_salesordercf.cf_857 AS orderDate, vtiger_salesordercf.cf_859 AS dateOfDelivery, vtiger_salesordercf.cf_855 AS cod,
+	vtiger_salesorder.salesorderid AS orderID 
+        from vtiger_salesorder 
+        inner join vtiger_salesordercf on vtiger_salesorder.salesorderid=vtiger_salesordercf.salesorderid 
+        inner join vtiger_crmentity on vtiger_salesorder.salesorderid=crmid and deleted=0 and setype='SalesOrder'
+        INNER JOIN vtiger_soshipads ON vtiger_soshipads.soshipaddressid = vtiger_salesorder.salesorderid
+        INNER JOIN(
+                SELECT vtiger_contactdetails.contactid , firstname AS customerFirstName, lastname AS customerLastName, mobile AS destPhone, email AS destEmail, department AS customerID
+                from vtiger_contactdetails 
+                inner join vtiger_contactscf on vtiger_contactdetails.contactid=vtiger_contactscf.contactid 
+                inner join vtiger_crmentity on vtiger_contactdetails.contactid=crmid and deleted=0 and setype='Contacts'
+        )AS contact ON contact.contactid = vtiger_salesorder.contactid
+        INNER JOIN vtiger_inventoryproductrel ON vtiger_inventoryproductrel.id = vtiger_salesorder.salesorderid
+        INNER JOIN(
+                SELECT vtiger_products.productcode as productID, vtiger_products.productname as productName, vtiger_products.productid AS idProdotto
+                from vtiger_products 
+                inner join vtiger_productcf on vtiger_products.productid=vtiger_productcf.productid 
+                inner join vtiger_crmentity on vtiger_products.productid=crmid and deleted=0 and setype='Products'
+        )AS product ON product.idProdotto = vtiger_inventoryproductrel.productid
+        ORDER BY orderID ASC";
+
+
+$salesOrders=runQuery($salesOrderQuery);
+
+$tmpID=0;
+foreach ($salesOrders as $salesOrder)
+{
+    if ($tmpID != $salesOrder['orderid'])
+    {
+        $i=0;
+    }
+    if ($i==0)
+    {
+        $tmpID = $salesOrder['orderid'];
+        updateContact($salesOrder);
+    }
+    sendOrder($salesOrder, $i);
+    $i++;
+}
+
+die();
+
+ 
+
+function getURL()
+{
+    writeLog("BEGIN :: function getURL");
+    $params = array(
+    "dl.usr" => "testinsert@dapsides.it",
+    "dl.pwd" => "testinsert@dapsides.it",
+    "dl.url" => "http://62.97.45.44:443/webapp/api/v3/createToken.php/process/"
+    );
+    
+    $url = $params['dl.url'] . $params['dl.usr'] . "/" . $params['dl.pwd'];
+    return $url;
+
+    writeLog("END :: function getURL");
+}
+
+
+
+
+
+
+function login(){
+    writeLog("BEGIN :: function login");
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, getURL());
+    curl_setopt($ch, CURLOPT_VERBOSE, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+
+    if (curl_errno($ch)) {
+        echo curl_errno($ch);
+        echo curl_error($ch);
+        $status = array("status" => "error", "msg" => "Errore di Login");
+        return false;
+    } else {
+        $result = curl_exec($ch);
+        $response = json_decode($result);
+        curl_close($ch);
+        $token = $response->csrf_value;
+    }
+    writeLog("function login generated token->".$token);
+    writeLog("END :: function login");
+    return $token;
+}
+
+
+
+        
+        
+function updateContact($row)       
+{
+    writeLog("BEGIN :: function updateContact");
+    $token = login();
+    $contact = array(
+        "customerFirstName"     => $row['customerfirstname'],
+        "customerLastName"      => $row['customerlastname'],
+        "destPhone"             => $row['destphone'],
+        "destEmail"             => $row['destemail'],
+        "destAddress"           => $row['destaddress'],
+        "destPostalCode"        => $row['destpostalcode'],
+        "destCity"              => $row['destcity'],
+        "destAreaCode"          => $row['destareacode'],
+        "destCountryCode"       => $row['destcountrycode'],
+        "orderDate"             => $row['orderdate'],
+        "deliveryInfo"          => $row['deliveryinfo'],
+    );
+    $jsonContact = json_encode($contact);
+    
+    // $row['customerid']=;
+    
+    $leadID = $row['customerid']; // Id contatto da aggiornare 
+    $url="http://62.97.45.44:443/webapp/api/updateLead/".$leadID;
+  
+
+    send($jsonContact, $token, $url);
+    writeLog("END :: function updateContact");
+    
+}       
+        
+        
+function sendOrder($row, $rowNum)
+{
+    writeLog("BEGIN :: function sendOrder");
+    $token = login();
+    $salesOrder=array();
+    $salesOrder[$rowNum]= array(
+        "orderID"           =>  $row['orderid'],
+        "customerID"        =>  $row['customerid'],
+        "destCity"          =>  $row['destcity'],
+        "destAddress"       =>  $row['destaddress'],
+        "destAreaCode"      =>  $row['destareacode'],
+        "destPostalCode"    =>  $row['destpostalcode'],
+        "destCountryCode"   =>  $row['destcountrycode'],
+        "destPhone"         =>  $row['destphone'],
+        "destEmail"         =>  $row['destemail'],
+        "orderDate"         =>  "2017-12-13",   //$row['orderdate'],
+        "deliveryInfo"      =>  $row['deliveryinfo'],
+        "dateOfDelivery"    =>  "2018-01-07",   // da modificare
+        "cod"               =>  "0",            // da modificare
+        "totalAmount"       =>  $row['totalamount'],
+        "orderRowID"        =>  $rowNum, 
+        "productID"         =>  $row['productid'],
+        "productName"       =>  $row['productname'],
+        "productQty"        =>  $row['productqty'],
+        "customerName"      =>  $row['customerfirstname'].$row['customerlastname'],
+    );
+
+  
+     /*
+    $salesOrder=array();
+    $salesOrder[1] = array(
+        "orderID" => "155", // ti passo l'id del crm es 139 o il numero univoco ordin S05?
+        "customerName" => "pippo", // mi devi dire cosa ti aspetti
+        "destCity" =>"Barcelona",
+        "destAddress" => "Via le mani da li",
+        "destAreaCode" => "XX", // cosa intendi
+        "destPostalCode" => "20200", // cap
+        "destCountryCode" => "IT",
+        "destPhone" => "123456789", // cellulare del contatto
+        "destEmail" =>"",
+        "orderDate" => "2017-12-13",
+        "deliveryInfo"=>"a las mañana",
+        "dateOfDelivery"=>"2018-01-07",
+        "cod"=>0, // questo cosa indica
+        "totalAmount" => 80.00, // totale dell'ordine
+        
+        "orderRowID" => "1",
+        "productID" =>"01xmlt6a",
+        "productName" => "CREMA XWZ",
+        "productQty" => 2
+    );
+    */
+    
+    
+    
+    $jsonSalesOrder = json_encode($salesOrder);
+    $url = "http://62.97.45.44:443/webapp/api/index.php/insertorder";
+    
+    send($jsonSalesOrder, $token, $url);
+    writeLog("END :: function sendOrder");
+}
+
+
+
+function send($json, $token, $url)
+{
+    writeLog("BEGIN :: function send");
+    writeLog("Params:  Json Code->".$json."     token->".$token."     URL->".$url);
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_VERBOSE, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json', 'Authorization: ' . $token));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+    if (curl_errno($ch)) {
+        echo curl_errno($ch);
+        echo curl_error($ch);
+        writeLog("Errore Curl: ".curl_error($ch)."    ".curl_errno($ch));
+    } else {
+        $result = curl_exec($ch);
+        $response = json_decode($result);
+        writeLog("Risposta Curl: ".print_r($response,true));
+        curl_close($ch);
+    }
+    writeLog("END :: function send");
+}
+
+
+
+function runQuery($query, $params = array())
+{
+    writeLog("BEGIN :: function runQuery");
+    global $adb;
+    $result = $adb->pquery($query,$params);
+    handleException($result);
+    while($row = $adb->fetchByAssoc($result)){
+        $rows[] = $row;
+        writeLog("Ordine di vendita: ".print_r($row,true));
+    }
+    writeLog("END :: function runQuery");
+    return $rows;
+}
+
+
+
+
+function handleException($result)
+{
+    writeLog("BEGIN :: function handleException");
+    if(!$result){
+       throw new Exception($adb->database->ErrorMsg(), $adb->database->ErrorNo());
+       writeLog("END :: function handleException -> Exception throwed");
+    }
+    else
+    {
+        writeLog("END :: function handleException -> No Exception throwed");
+    }
+}
+
+
+
+function writeLog($msg){
+    $file = 'logs/'.date('d').'DapLink.log';
+    $now = date("Y-m-d H:i:s");
+    $res = file_put_contents($file, "$now |  => $msg" . PHP_EOL, FILE_APPEND | LOCK_EX);
+    if ($res == false){
+            throw new Exception("cannot write log file");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
+$querySalesOrder = 'select * from SalesOrder';
+
+$a = new sendArray($current_user, $params);
+//die("todo bien");
+
+// $SalesOrders = $a->runQuery($querySalesOrder);
+
+
+
+
+// Array di Ordini di Vendita
+ print_r ($SalesOrders);
+
+
+/*
+foreach ($SalesOrders as $SalesOrder){
+	$queryProduct = 'select * from Products where id='.$SalesOrder['productid'];
+	$products = $a->runQuery($queryProduct);
+	
+	$data = array (
+        'productname' 	=> $products['productname'],			// Nome del Prodotto
+        'productcode' 	=> $products['productcode'],			// Codice Seriale
+        'discontinued'	=> $products['discontinued'],			// Lasciare sempre 1
+        'unit_price'	=> $products['unit_price'],				// Prezzo per pezzo
+        'commissionrate'=> $products['commissionrate'],			// Commissioni 
+        'description' 	=> $products['description'],			// Descrizione dettagliata del prodotto
+        'tax1' 			=> $products['tax1'],					// Aliquota IVA  
+    );
+	
+	// $a->sendCreate('Products', $data);
+}  
+
+*/
+
+
+
+
+
+//class sendArray{
+//
+//	protected $current_user;
+//	protected $url;
+//	protected $usr;
+//	protected $ack;
+//	protected $client;
+//	
+//	
+//	function __construct($current_user, $params){
+//		$this->current_user = $current_user;
+//
+//		$this->usr = $params['usr'];
+//		$this->ack = $params['ack'];
+//		$this->url = $params['url'];
+//	}
+//	
+//	private function login()
+//	{
+//		include_once('vtwsclib/Vtiger/WSClient.php');
+//		$this->client = new Vtiger_WSClient($this->url);
+//		$login = $this->client->doLogin($this->usr, $this->ack);
+//		if(!$login){ 
+//			$this->writeLog('Login Failed');
+//			return false;
+//		}
+//		else {
+//			$this->writeLog('Login Successful');
+//			return true
+//		}
+//	}
+//	
+//	public function sendCreate($module, $data){
+//
+//		$record = $client->doCreate($module,$data);
+//		if($record) {
+//			$this->writeLog("Nuovo {$module} creato".print_r($record,true));
+//		}
+//		else{
+//			$error = $client->lastError();
+//			throw new Exception($error['code']. ' ' .$error['message']);
+//		}
+//	}
+//
+//
+///*	public function runQuery($query){
+//	// controllo se c'è il ; alla fine della query altrimenti lo aggiungo
+//	if(!strpos($query, ';')){
+//		$query.=';';
+//	}
+//	
+//	include_once 'include/Webservices/Query.php';
+//	try {
+//			$records = vtws_query($query, $this->current_user);
+//			print_r($records);
+//
+//	} catch (WebServiceException $ex) {
+//			echo $ex->getMessage();
+//	}
+//	
+//	$this->writeLog(print_r($records,true));
+//	return $records;
+//	}
+//	
+//*/	
+//	
+//	
+//	 
+//    /* Scrive i log nel file logs/[data]smartone.log
+//     * @param string $msg
+//     * @param string $type
+//     */
+//    static function writeLog($msg){
+//        $file = 'logs/'.date('d').'AlgomaSendArray.log';
+//		$now = date("Y-m-d H:i:s");
+//		$res = file_put_contents($file, "$now | $logLevel[$type] => $msg" . PHP_EOL, FILE_APPEND | LOCK_EX);
+//		if ($res == false){
+//			throw new Exception("cannot write log file");
+//		}
+//
+//    }
+//	
+//	
+//	
+//}
