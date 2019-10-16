@@ -19,7 +19,7 @@ $token = "";
 
 
 //  2.1. Inserimento di un ordine
-$insertNewOrder = true; // non funziona  
+$insertNewOrder = false; // non funziona  
 //{"status":"error","message":"Duplicate orderID"}
 
 
@@ -40,6 +40,7 @@ $codicearticolo = "1";
 // 4.1. Inserimento contatto
 $creaContatto = false; // ERRORE
 // <title>Page Not Found</title >
+$updateContatto = true;
 
 
 
@@ -261,10 +262,35 @@ if ($insertNewOrder == true) {
     }
 }
 
-/*
-    Nell ordine
-        contactrecord :   id di vtiger del contatto (YxZ)
- 
-  
+
+if($updateContatto == true){
     
- */
+    $leadID = 'AA123'; // Id contatto da aggiornare 
+    $url="http://62.97.45.44:443/webapp/api/updateLead/".$leadID;
+    $data = '{"customerFirstName":"Emanuele2","customerLastName":"Rizzo2","destPhone":"987654", '
+            . '"destEmail":"testoooo@mail.it", "destAddress":"XXX", "destPostalCode":"XXX", '
+            . '"destCity":"XXX", "destAreaCode":"XXX", "destCountryCode":"XXX", '
+            . '"orderDate":"XXX", "deliveryInfo":"XXX"}';
+
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_VERBOSE, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json','Authorization: '.$token));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    if (curl_errno($ch)) {
+        echo curl_errno($ch);
+        echo curl_error($ch);
+    } else {
+        $result = curl_exec($ch);
+        $response = json_decode( $result );
+        echo $result.PHP_EOL;
+        curl_close($ch);
+
+    }
+
+}
