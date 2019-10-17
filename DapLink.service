@@ -17,8 +17,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 $current_user = Users::getActiveAdminUser();
-
-
+setSalesOrderConfirmed(60, $current_user);
 //$path = dirname(__FILE__);
 //$params = file_get_contents(dirname(__FILE__) ."/params.json");
 //$params =  json_decode($params, true);
@@ -66,35 +65,47 @@ $send= false;
 $tmpID=0;
 $i=0;
 $num = count($salesOrders);
+
+$newOrder = true;
+$orderCode = '';
+$firstTime = true;
+$i=0;
+
 foreach ($salesOrders as $salesOrder){
     
-    if ($i==0 || $send == true){
-        $tmpID = $salesOrder['orderid'];
-        updateContact($salesOrder);
-        $send = false;
-    }
-    
-    if ($tmpID != $salesOrder['orderid']){
-        sendOrder($temp, $tmpID, $current_user);
-        unset($temp);
-        $send=true;
-        $i=0;
-    }
-    
-    
-        $temp[] = fillOrder($salesOrder, $i);
-        
-    
     $i++;
-    $cnt++;    
-    if ($num == $cnt)
-    {
-       sendOrder($temp, $tmpID, $current_user); 
+    if($firstTime == true){
+        $orderCode = $salesOrder['orderid'];
+        $firstTime = false;
     }
+    
+    if($orderCode != $salesOrder['orderid']){
+        // invio contatto 
+        updateContact($salesOrders[$i-1]);
+        // Invio ordine 
+        sendOrder($orderArray, $orderCode, $current_user);
+        // Resetto l'array
+        unset($orderArray);
+        
+        // Imposto variabile $firstTime così da poter salvare un nuovo ID
+        $orderCode = $salesOrder['orderid'];
+        // $firstTime = true;
+    }
+    
+    // Creo un array per l'ordine
+    $orderArray[] = fillOrder($salesOrder, $i);    
+    
 }
 
-  
-    
+// invio ultimo contatto
+updateContact($salesOrders[$i-1]);
+// iNVIO ORDINE ULTIMO
+sendOrder($orderArray, $orderCode, $current_user);
+ 
+ 
+
+
+
 
 
 die();
@@ -134,6 +145,7 @@ function getURL()
     "dl.usr" => "testinsert@dapsides.it",
     "dl.pwd" => "testinsert@dapsides.it",
     "dl.url" => "http://62.97.45.44:443/webapp/api/v3/createToken.php/process/"
+   // "dl.url" => "https://cloud.dapsides.it/webappdev/api/v3/createToken.php/process/"
     );
     
     $url = $params['dl.url'] . $params['dl.usr'] . "/" . $params['dl.pwd'];
@@ -144,7 +156,7 @@ function getURL()
 
 
 
-
+// https://cloud.dapsides.it/webappdev/api/index.php
 
 
 function login(){
@@ -213,9 +225,9 @@ function fillOrder($row, $rowNum)
 {
     
     writeLog("BEGIN :: function sendOrder");
-    // $token = login();
+    // $token = login();[$rowNum]
     $salesOrder=array();
-    $salesOrder[$rowNum]= array(
+    $salesOrder= array(
         "orderID"           =>  $row['orderid'],
         "customerID"        =>  $row['customerid'],
         "destCity"          =>  $row['destcity'],
@@ -244,6 +256,8 @@ function fillOrder($row, $rowNum)
 function sendOrder($salesOrder, $id, $current_user)
 {
     writeLog("BEGIN :: sendOrder params->".print_r($salesOrder,true));
+   //  return;
+    $token = login();
     $jsonSalesOrder = json_encode($salesOrder);
     $url = "http://62.97.45.44:443/webapp/api/index.php/insertorder";
     
@@ -262,7 +276,7 @@ function sendOrder($salesOrder, $id, $current_user)
 
 function send($json, $token, $url)
 {
-    // $url="http://62.97.45.44:443/webapp/api/index.php/updateLead/AA123";
+   // $url="http://62.97.45.44:443/webapp/api/index.php/updateLead/AA123";
     writeLog("BEGIN :: function send");
     writeLog("Params:  Json Code->".$json."     token->".$token."     URL->".$url);
     $ch = curl_init();
@@ -284,7 +298,8 @@ function send($json, $token, $url)
         writeLog("Risposta Curl: ".print_r($response,true));
         curl_close($ch);
     }
-    
+   
+   
 
     writeLog("END :: function send");
     return $response;
@@ -363,143 +378,3 @@ function clearLog()
     handleException($result);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-
-
-$querySalesOrder = 'select * from SalesOrder';
-
-$a = new sendArray($current_user, $params);
-//die("todo bien");
-
-// $SalesOrders = $a->runQuery($querySalesOrder);
-
-
-
-
-// Array di Ordini di Vendita
- print_r ($SalesOrders);
-
-
-/*
-foreach ($SalesOrders as $SalesOrder){
-	$queryProduct = 'select * from Products where id='.$SalesOrder['productid'];
-	$products = $a->runQuery($queryProduct);
-	
-	$data = array (
-        'productname' 	=> $products['productname'],			// Nome del Prodotto
-        'productcode' 	=> $products['productcode'],			// Codice Seriale
-        'discontinued'	=> $products['discontinued'],			// Lasciare sempre 1
-        'unit_price'	=> $products['unit_price'],				// Prezzo per pezzo
-        'commissionrate'=> $products['commissionrate'],			// Commissioni 
-        'description' 	=> $products['description'],			// Descrizione dettagliata del prodotto
-        'tax1' 			=> $products['tax1'],					// Aliquota IVA  
-    );
-	
-	// $a->sendCreate('Products', $data);
-}  
-
-*/
-
-
-
-
-
-//class sendArray{
-//
-//	protected $current_user;
-//	protected $url;
-//	protected $usr;
-//	protected $ack;
-//	protected $client;
-//	
-//	
-//	function __construct($current_user, $params){
-//		$this->current_user = $current_user;
-//
-//		$this->usr = $params['usr'];
-//		$this->ack = $params['ack'];
-//		$this->url = $params['url'];
-//	}
-//	
-//	private function login()
-//	{
-//		include_once('vtwsclib/Vtiger/WSClient.php');
-//		$this->client = new Vtiger_WSClient($this->url);
-//		$login = $this->client->doLogin($this->usr, $this->ack);
-//		if(!$login){ 
-//			$this->writeLog('Login Failed');
-//			return false;
-//		}
-//		else {
-//			$this->writeLog('Login Successful');
-//			return true
-//		}
-//	}
-//	
-//	public function sendCreate($module, $data){
-//
-//		$record = $client->doCreate($module,$data);
-//		if($record) {
-//			$this->writeLog("Nuovo {$module} creato".print_r($record,true));
-//		}
-//		else{
-//			$error = $client->lastError();
-//			throw new Exception($error['code']. ' ' .$error['message']);
-//		}
-//	}
-//
-//
-///*	public function runQuery($query){
-//	// controllo se c'è il ; alla fine della query altrimenti lo aggiungo
-//	if(!strpos($query, ';')){
-//		$query.=';';
-//	}
-//	
-//	include_once 'include/Webservices/Query.php';
-//	try {
-//			$records = vtws_query($query, $this->current_user);
-//			print_r($records);
-//
-//	} catch (WebServiceException $ex) {
-//			echo $ex->getMessage();
-//	}
-//	
-//	$this->writeLog(print_r($records,true));
-//	return $records;
-//	}
-//	
-//*/	
-//	
-//	
-//	 
-//    /* Scrive i log nel file logs/[data]smartone.log
-//     * @param string $msg
-//     * @param string $type
-//     */
-//    static function writeLog($msg){
-//        $file = 'logs/'.date('d').'AlgomaSendArray.log';
-//		$now = date("Y-m-d H:i:s");
-//		$res = file_put_contents($file, "$now | $logLevel[$type] => $msg" . PHP_EOL, FILE_APPEND | LOCK_EX);
-//		if ($res == false){
-//			throw new Exception("cannot write log file");
-//		}
-//
-//    }
-//	
-//	
-//	
-//}
