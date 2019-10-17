@@ -7,30 +7,53 @@ require_once("modules/Emails/class.phpmailer.php");
 require_once("modules/Emails/mail.php");
 require_once('include/logging.php');
 require_once("config.php");
-
+require_once ("cron/modules/SalesOrder/DapLinkClass.php");
 include_once 'include/Webservices/Query.php';
-include_once 'include/Webservices/Revise.php';
+include_once 'include/Webservices/Update.php';
+include_once 'include/Webservices/Retrieve.php';
+include_once 'include/Webservices/Utils.php';
 
-global $adb;
+// global $adb;
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 $current_user = Users::getActiveAdminUser();
-setSalesOrderConfirmed(60, $current_user);
-//$path = dirname(__FILE__);
-//$params = file_get_contents(dirname(__FILE__) ."/params.json");
-//$params =  json_decode($params, true);
+
+
 
 /*
- *  Pulisco i log
- */
-$clearLog = true;
-if ($clearLog == true)
-{
-    clearLog();
-}
+* MAIN 
+*//*
+ $id = 60;
+ try {
+        $wsid = vtws_getWebserviceEntityId('SalesOrder', $id); // Module_Webservice_ID x CRM_ID
+        $data = array('sostatus' => 'DaplinkAccepted', 'id' => $wsid, 'hdnTaxType' => 'group');
 
+        $so = vtws_retrieve($wsid, $current_user);
+        $so['invoicestatus'] = 'AutoCreated';
+        $so['sostatus'] = 'DaplinkAccepted';
+        $so['id'] = $wsid;
+
+        $data = vtws_update($so, $current_user);
+        print_r($data);
+
+} catch (WebServiceException $ex) {
+        echo $ex->getMessage();
+}
+ // setSalesOrderConfirmed($tmpID, $current_user);
+die();*/
+
+
+
+
+$a = new DapLinkClass();
+
+// Pulisco i log se $ clearLog è a true
+$clearLog = true;
+if ($clearLog == true){
+    $a->clearLog();
+}
 
 $salesOrderQuery="SELECT  contact.*, product.*, vtiger_inventoryproductrel.quantity AS productQty,
 	vtiger_soshipads.ship_city AS destCity, vtiger_soshipads.ship_code AS destPostalCode, vtiger_soshipads.ship_country AS destCountryCode, vtiger_soshipads.ship_state AS destAreaCode, vtiger_soshipads.ship_street AS destAddress,
@@ -58,18 +81,24 @@ $salesOrderQuery="SELECT  contact.*, product.*, vtiger_inventoryproductrel.quant
         ORDER BY orderID ASC";
 
 
-$salesOrders=runQuery($salesOrderQuery);
+$salesOrders = $a->runQuery($salesOrderQuery);
 
-$check= false;
-$send= false;
-$tmpID=0;
-$i=0;
-$num = count($salesOrders);
+// Se non abbiamo dati da mandari usciamo senza entrare
+if(count($salesOrders ) == 0)
+    return;
 
-$newOrder = true;
-$orderCode = '';
-$firstTime = true;
-$i=0;
+// Apro curl e faccio la Login
+try{
+$a->login();
+}catch (Exception $e){
+        
+    return;
+}
+
+$newOrder   =  true;
+$orderCode  =  '';
+$firstTime  =  true;
+$i = 0;
 
 foreach ($salesOrders as $salesOrder){
     
@@ -81,9 +110,10 @@ foreach ($salesOrders as $salesOrder){
     
     if($orderCode != $salesOrder['orderid']){
         // invio contatto 
-        updateContact($salesOrders[$i-1]);
+        $c = $a->fillContact($salesOrders[$i-1]);
+        $a->updateContact($c);
         // Invio ordine 
-        sendOrder($orderArray, $orderCode, $current_user);
+        $a->insertOrder($orderArray, $orderCode, $current_user);
         // Resetto l'array
         unset($orderArray);
         
@@ -93,288 +123,12 @@ foreach ($salesOrders as $salesOrder){
     }
     
     // Creo un array per l'ordine
-    $orderArray[] = fillOrder($salesOrder, $i);    
+    $orderArray[] = $a->fillOrder($salesOrder, $i);    
     
 }
 
 // invio ultimo contatto
-updateContact($salesOrders[$i-1]);
+$c = $a->fillContact($salesOrders[$i-1]);
+$a->updateContact($c);
 // iNVIO ORDINE ULTIMO
-sendOrder($orderArray, $orderCode, $current_user);
- 
- 
-
-
-
-
-
-die();
-
- 
-
-
-
-function setSalesOrderConfirmed($tmpID, $current_user){
-    try {
-        $wsid = vtws_getWebserviceEntityId('SalesOrder', $tmpID); // Module_Webservice_ID x CRM_ID
-        $data = array('sostatus' => 'DaplinkAccepted', 'id' => $wsid);
-        $lead = vtws_revise($data, $current_user);
-        print_r($lead);
-
-    } catch (WebServiceException $ex) {
-            echo $ex->getMessage();
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-function getURL()
-{
-    writeLog("BEGIN :: function getURL");
-    $params = array(
-    "dl.usr" => "testinsert@dapsides.it",
-    "dl.pwd" => "testinsert@dapsides.it",
-    "dl.url" => "http://62.97.45.44:443/webapp/api/v3/createToken.php/process/"
-   // "dl.url" => "https://cloud.dapsides.it/webappdev/api/v3/createToken.php/process/"
-    );
-    
-    $url = $params['dl.url'] . $params['dl.usr'] . "/" . $params['dl.pwd'];
-    return $url;
-
-    writeLog("END :: function getURL");
-}
-
-
-
-// https://cloud.dapsides.it/webappdev/api/index.php
-
-
-function login(){
-    writeLog("BEGIN :: function login");
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, getURL());
-    curl_setopt($ch, CURLOPT_VERBOSE, 1);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
-
-    if (curl_errno($ch)) {
-        echo curl_errno($ch);
-        echo curl_error($ch);
-        $status = array("status" => "error", "msg" => "Errore di Login");
-        return false;
-    } else {
-        $result = curl_exec($ch);
-        $response = json_decode($result);
-        curl_close($ch);
-        $token = $response->csrf_value;
-    }
-    writeLog("function login generated token->".$token);
-    writeLog("END :: function login");
-    return $token;
-}
-
-
-
-        
-        
-function updateContact($row)       
-{
-    writeLog("BEGIN :: function updateContact");
-    $token = login();
-    $contact = array(
-        "customerFirstName"     => $row['customerfirstname'],
-        "customerLastName"      => $row['customerlastname'],
-        "destPhone"             => $row['destphone'],
-        "destEmail"             => $row['destemail'],
-        "destAddress"           => $row['destaddress'],
-        "destPostalCode"        => $row['destpostalcode'],
-        "destCity"              => $row['destcity'],
-        "destAreaCode"          => $row['destareacode'],
-        "destCountryCode"       => $row['destcountrycode'],
-        "orderDate"             => $row['orderdate'],
-        "deliveryInfo"          => $row['deliveryinfo'],
-    );
-    $jsonContact = json_encode($contact);
-    
-    
-    $leadID = 'AA123'; // Dalla query che ho fatto tiro su il depatment $row['dep....']
-    $url="http://62.97.45.44:443/webapp/api/index.php/updateLead/".$leadID;
-    
-    
-    $response=send($jsonContact, $token, $url);
-    daplinkLog($jsonContact, print_r($response,true), $row['contactid'], $leadID);
-    writeLog("END :: function updateContact");
-    
-}       
-        
-        
-function fillOrder($row, $rowNum)
-{
-    
-    writeLog("BEGIN :: function sendOrder");
-    // $token = login();[$rowNum]
-    $salesOrder=array();
-    $salesOrder= array(
-        "orderID"           =>  $row['orderid'],
-        "customerID"        =>  $row['customerid'],
-        "destCity"          =>  $row['destcity'],
-        "destAddress"       =>  $row['destaddress'],
-        "destAreaCode"      =>  $row['destareacode'],
-        "destPostalCode"    =>  $row['destpostalcode'],
-        "destCountryCode"   =>  $row['destcountrycode'],
-        "destPhone"         =>  $row['destphone'],
-        "destEmail"         =>  $row['destemail'],
-        "orderDate"         =>  "2017-12-13",   //$row['orderdate'],
-        "deliveryInfo"      =>  $row['deliveryinfo'],
-        "dateOfDelivery"    =>  "2018-01-07",   // da modificare
-        "cod"               =>  "0",            // da modificare
-        "totalAmount"       =>  $row['totalamount'],
-        "orderRowID"        =>  $rowNum, 
-        "productID"         =>  $row['productid'],
-        "productName"       =>  $row['productname'],
-        "productQty"        =>  $row['productqty'],
-        "customerName"      =>  $row['customerfirstname'].$row['customerlastname'],
-    );
-    return $salesOrder;
-}
-
-
-
-function sendOrder($salesOrder, $id, $current_user)
-{
-    writeLog("BEGIN :: sendOrder params->".print_r($salesOrder,true));
-   //  return;
-    $token = login();
-    $jsonSalesOrder = json_encode($salesOrder);
-    $url = "http://62.97.45.44:443/webapp/api/index.php/insertorder";
-    
-    $response=send($jsonSalesOrder, $token, $url /*, $row['orderid']*/);
-    if ($response['status']=='success')
-    {
-         setSalesOrderConfirmed($id, $current_user);
-    }
-   
-    daplinkLog($jsonSalesOrder, print_r($response,true), $id);
-    writeLog("END :: function sendOrder");
-    return $check;
-}
-
-
-
-function send($json, $token, $url)
-{
-   // $url="http://62.97.45.44:443/webapp/api/index.php/updateLead/AA123";
-    writeLog("BEGIN :: function send");
-    writeLog("Params:  Json Code->".$json."     token->".$token."     URL->".$url);
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_VERBOSE, 1);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json', 'Authorization: ' . $token));
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
-    if (curl_errno($ch)) {
-        echo curl_errno($ch);
-        echo curl_error($ch);
-        writeLog("Errore Curl: ".curl_error($ch)."    ".curl_errno($ch));
-    } else {
-        $result = curl_exec($ch);
-        $response = json_decode($result, true);
-        writeLog("Risposta Curl: ".print_r($response,true));
-        curl_close($ch);
-    }
-   
-   
-
-    writeLog("END :: function send");
-    return $response;
-}
-
-
-
-function runQuery($query, $params = array())
-{
-    writeLog("BEGIN :: function runQuery");
-    global $adb;
-    $result = $adb->pquery($query,$params);
-    handleException($result);
-    while($row = $adb->fetchByAssoc($result)){
-        $rows[] = $row;
-        writeLog("Ordine di vendita: ".print_r($row,true));
-    }
-    writeLog("END :: function runQuery");
-    return $rows;
-}
-
-
-
-
-function handleException($result)
-{
-    global $adb;
-    writeLog("BEGIN :: function handleException");
-    if(!$result){
-       throw new Exception($adb->database->ErrorMsg(), $adb->database->ErrorNo());
-       writeLog("END :: function handleException -> Exception throwed");
-    }
-    else
-    {
-        writeLog("END :: function handleException -> No Exception throwed");
-    }
-}
-
-
-
-function writeLog($msg){
-    $file = 'logs/'.date('d').'DapLink.log';
-    $now = date("Y-m-d H:i:s");
-    $res = file_put_contents($file, "$now |  => $msg" . PHP_EOL, FILE_APPEND | LOCK_EX);
-    if ($res == false){
-            throw new Exception("cannot write log file");
-    }
-}
-
-
-
-
-function daplinkLog($request, $response, $entityid, $daplinkid = '' )
-{
-    global $adb;
-    $date = date('Y-m-d H:i:s');
-    
-    $query="INSERT INTO daplink_log (dt, request, response, entityid, daplinkid) VALUES (?,?,?,?,?)";
-    $result = $adb->pquery($query, array($date, $request, $response, $entityid, $daplinkid));
-    handleException($result);
-}
-
-
-
-
-
-
-function clearLog()
-{
-    global $adb;
-    $file = 'logs/'.date('d').'DapLink.log';
-    unlink($file);
-    writeLog('NUOVA IMPORTAZIONE INIZIATA');
-    $clear="TRUNCATE TABLE daplink_log";
-    $result = $adb->pquery($clear, array());
-    handleException($result);
-}
-
+$a->insertOrder($orderArray, $orderCode, $current_user);

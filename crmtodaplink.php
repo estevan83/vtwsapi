@@ -13,8 +13,8 @@ $params = file_get_contents(dirname(__FILE__) ."/params.json");
 
 $params =  json_decode($params, true);
 
-// $url = $params['dl.url'] . $params['dl.usr'] . "/" . $params['dl.pwd'];
-$url = "https://cloud.dapsides.it/webappdev/api/v3/createToken.php/process/". $params['dl.usr'] . "/" . $params['dl.pwd'];
+$url = $params['dl.url'] . $params['dl.usr'] . "/" . $params['dl.pwd'];
+// $url = "https://cloud.dapsides.it/webappdev/api/v3/createToken.php/process/". $params['dl.usr'] . "/" . $params['dl.pwd'];
 
 $token = "";
 
@@ -67,7 +67,7 @@ if(strlen($token) == 0){
         $token = $response->csrf_value;
     }
 }
-die ($token);
+
 // -----------------------------------------------------------
 // Creazione del contatto
 // ------------------------------------------------------------
@@ -110,7 +110,7 @@ if($creaContatto == true){
     }
 }
 
-$updateContatto = false;
+$updateContatto = true;
 if ($updateContatto == true)
 {
     
