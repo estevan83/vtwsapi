@@ -14,18 +14,17 @@ include_once 'include/Webservices/Update.php';
 
 
 
-
-
 class DapLinkClass {
-    //put your code here
     
   //  public $curl = '';
-    protected $token = '';
-    protected $url; 
-    protected $usr; 
-    protected $pwd; 
-    protected $current_user;
-    protected $adb;
+    protected $token;           // Generato automaticamente dalla funzione Login
+    protected $current_user;    // Utente corrente 
+    protected $adb;             // Connessione al DB
+    
+    protected $url;             // URL in comune con tutte le funzioni (Login e Send)   -> Configurabile nel file params.json
+    protected $LogFileName;     // Nome del file dei log                                -> Configurabile nel file params.json
+    protected $usr;             // Utente per Login                                     -> Configurabile nel file params.json
+    protected $pwd;             // Password per Login                                   -> Configurabile nel file params.json
     
     
     
@@ -38,7 +37,8 @@ class DapLinkClass {
         $params =  json_decode($params, true);
         $this->url = $params['dl.url'];
         $this->usr = $params['dl.usr'];
-        $this->pwd = $params['dl.pwd'];       
+        $this->pwd = $params['dl.pwd'];  
+        $this->LogFileName = $params['LogFileName'];       
     }
     /*
     public function opencurl()
@@ -63,7 +63,7 @@ class DapLinkClass {
      */
     public function login(){
         $this->writeLog("BEGIN :: function login");
-        $url = $this->url.$this->usr.'/'.$this->pwd . 'fillContact';
+        $url = $this->url."v3/createToken.php/process/".$this->usr.'/'.$this->pwd.'a';
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_VERBOSE, 1);
@@ -73,18 +73,19 @@ class DapLinkClass {
         curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
         if (curl_errno($ch)) {
+            $this->writeLog("function login curl error",'FAILED');
             throw new Exception(curl_error($ch), curl_errno($ch));
         } else {
             $result = curl_exec($ch);
-            $response = json_decode($result);
+            $response = json_decode($result,true);
             curl_close($ch);
             
             if($response['status'] ==='error'){
-                $this->writeLog("function login ". $response['message']);
+                $this->writeLog("function login ". $response['message'],'FAILED');
                 throw new Exception($response['message']);
             }
             
-            $this->token = $response->csrf_value;
+            $this->token = $response['csrf_value'];
         }
         
         $this->writeLog("function login generated token->".$this->token);
@@ -158,14 +159,16 @@ class DapLinkClass {
      */
     public function updateContact($row, $id=null){
 
+         if($id==null)
+            $leadID = $row['customerID'];
+         else 
+             $leadID = $id;
+        unset($row['customerID']);
         $jsonContact = json_encode($row);
 
-        if($id==null)
-            $leadID = $row['customerid'];
+       
         
-        $url="http://62.97.45.44:443/webapp/api/updateLead/".$leadID; //@todo da portare fuori
-   
-        
+        $url = "index.php/updateLead/".$leadID; //@todo da portare fuori
         $response=$this->send($jsonContact, $url);
         
         $this->daplinkLog($jsonContact, print_r($response,true), $row['contactid'], $leadID);
@@ -183,7 +186,7 @@ class DapLinkClass {
         $this->writeLog("BEGIN :: sendOrder params->".print_r($salesOrder,true));
        //  return;
         $jsonSalesOrder = json_encode($salesOrder);
-        $url = "http://62.97.45.44:443/webapp/api/index.php/insertorder";//@todo review
+        $url = "index.php/insertorder";//@todo review
 
         $response=$this->send($jsonSalesOrder,  $url );
         if ($response['status']=='success')
@@ -212,7 +215,7 @@ class DapLinkClass {
 
         $so = vtws_retrieve($wsid, $this->current_user);
         $so['invoicestatus'] = 'AutoCreated';
-        $so['sostatus'] = 'DaplinkAccepted';
+        $so['sostatus'] = $sostatus;
         $so['id'] = $wsid;
 
         $data = vtws_update($so, $this->current_user);
@@ -234,6 +237,7 @@ class DapLinkClass {
      */
     public function send($json,  $url){
         $this->writeLog("BEGIN :: function send");
+        $url = $this->url.$url;
         $this->writeLog("Params:  Json Code->".$json."     token->".$this->token."     URL->".$url);
         $ch = curl_init(); // $ch = $this->curl;
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -247,7 +251,7 @@ class DapLinkClass {
         if (curl_errno($ch)) {
           /*  echo curl_errno($ch);
             echo curl_error($ch);*/
-            $this->writeLog("Errore Curl: ".curl_error($ch)."    ".curl_errno($ch));
+            $this->writeLog("Errore Curl: ".curl_error($ch)."    ".curl_errno($ch), 'FAILED');
             throw new Exception(curl_error($ch), curl_errno($ch));
         } else {
             
@@ -255,6 +259,10 @@ class DapLinkClass {
             curl_close($ch);
             $response = json_decode($result,true);
             // todo in base alla rssposta lanciare un eccezzione se success = warning /error
+            if($response['status'] ==='error'){
+                $this->writeLog("function send ". $response['message'], 'FAILED');
+                throw new Exception($response['message']);
+            }
             $this->writeLog("Risposta Curl: ".print_r($response,true));
             
         }
@@ -299,11 +307,11 @@ class DapLinkClass {
         $this->writeLog("BEGIN :: function handleException");
         if(!$result){
            throw new Exception($this->adb->database->ErrorMsg(), $this->adb->database->ErrorNo());
-           $this->writeLog("END :: function handleException -> Exception throwed");
+           $this->writeLog("END :: function handleException -> Database Exception throwed",'FAILED');
         }
         else
         {
-            $this->writeLog("END :: function handleException -> No Exception throwed");
+            $this->writeLog("END :: function handleException ->No Database Exception throwed");
         }
     }
 
@@ -313,12 +321,13 @@ class DapLinkClass {
      * @param string $msg Stringa da Loggare
      * @throws Exception
      */
-    static function writeLog($msg){
-        $file = 'logs/'.date('d').'DapLink.log';
+    public function writeLog($msg, $level = 'DEBUG'){
+        $file = 'logs/'.date('d').$this->LogFileName;
         $now = date("Y-m-d H:i:s");
-        $res = file_put_contents($file, "$now |  => $msg" . PHP_EOL, FILE_APPEND | LOCK_EX);
+        $res = file_put_contents($file, "$now |  [$level] => $msg" . PHP_EOL, FILE_APPEND | LOCK_EX);
         if ($res == false){
                 throw new Exception("cannot write log file");
+                $this->writeLog("function writeLog -> Exception throwed",'FAILED');
         }
     }
 
@@ -346,7 +355,7 @@ class DapLinkClass {
      */
     public function clearLog()
     {
-        $file = 'logs/'.date('d').'DapLink.log';
+        $file = 'logs/'.date('d').$this->LogFileName;
         unlink($file);
         $this->writeLog('NUOVA IMPORTAZIONE INIZIATA');
         $clear="TRUNCATE TABLE daplink_log";

@@ -91,7 +91,7 @@ if(count($salesOrders ) == 0)
 try{
 $a->login();
 }catch (Exception $e){
-        
+    // $a->writeLog("Errore nella generazione del token");    
     return;
 }
 
@@ -111,9 +111,21 @@ foreach ($salesOrders as $salesOrder){
     if($orderCode != $salesOrder['orderid']){
         // invio contatto 
         $c = $a->fillContact($salesOrders[$i-1]);
-        $a->updateContact($c);
+        try{
+            $a->updateContact($c);
+        }
+        catch (Exception $e){
+        
+           
+        }
+        try{
         // Invio ordine 
         $a->insertOrder($orderArray, $orderCode, $current_user);
+         }
+        catch (Exception $e){
+        
+           
+        }
         // Resetto l'array
         unset($orderArray);
         
@@ -129,6 +141,18 @@ foreach ($salesOrders as $salesOrder){
 
 // invio ultimo contatto
 $c = $a->fillContact($salesOrders[$i-1]);
-$a->updateContact($c);
+try{
+    $a->updateContact($c);
+}
+catch (Exception $e){
+ 
+}
+
+
 // iNVIO ORDINE ULTIMO
-$a->insertOrder($orderArray, $orderCode, $current_user);
+try{
+    $a->insertOrder($orderArray, $orderCode, $current_user);
+}
+catch (Exception $e){
+
+}
