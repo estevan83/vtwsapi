@@ -136,7 +136,6 @@ if($createOrder == true){
 			
             'terms_conditions' =>'terms_conditions',
             'description' => 'description',
-            'exciseduty' => 0, // 0 o 1 un funzione della tipologia
              
            // 'currency_id' => vtws_getWebserviceEntityId('Currency','1'),
             'hdnTaxType' => 'group',
